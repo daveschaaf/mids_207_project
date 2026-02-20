@@ -7,7 +7,6 @@ from pathlib import Path
 
 @pytest.fixture
 def real_data():
-    """Load real H&M data for integration tests"""
     data_path = Path("./data")
     
     if not data_path.exists():
@@ -26,25 +25,47 @@ def real_data():
         'articles': pd.read_csv(articles_path)
     }
 
-@pytest.fixture
-def cfe(real_data):
-    customers_df = real_data['customers']
-    transactions_df = real_data['transactions']
-    return CustomerFeatureEngineer(customers_df, transactions_df)
-
-def test_customer_feature_engineer_init(cfe):
+def test_customer_feature_engineer_init():
+    test_customers = pd.DataFrame({'customer_id': ['cust_1']})
+    test_transactions = pd.DataFrame({
+        't_dat': ['2019-10-01'],
+        'customer_id': ['cust_1'],
+        'article_id': [123],
+        'price': [0.01]
+    })
+    
+    cfe = CustomerFeatureEngineer(test_customers, test_transactions)
     assert isinstance(cfe.customers, pd.DataFrame)
     assert isinstance(cfe.transactions, pd.DataFrame)
     assert pd.api.types.is_datetime64_any_dtype(cfe.transactions['t_dat'])
 
-def test_rfm_returns_correct_columns(cfe):
+
+def test_rfm_returns_correct_columns():
+    test_customers = pd.DataFrame({'customer_id': ['cust_1']})
+    test_transactions = pd.DataFrame({
+        't_dat': ['2019-10-01'],
+        'customer_id': ['cust_1'],
+        'article_id': [123],
+        'price': [0.01]
+    })
+    
+    cfe = CustomerFeatureEngineer(test_customers, test_transactions)
     result = cfe.calculate_rfm_and_behaviors(as_of_date='2019-10-31')
+    
     assert 'customer_id' in result.columns
     assert 'days_since_last_purchase' in result.columns
-    assert 'num_purchases' in result.columns
-    assert 'total_spent' in result.columns
 
-def test_rfm_correct_types(cfe):
+def test_rfm_correct_types():
+    test_customers = pd.DataFrame({'customer_id': ['cust_1']})
+    test_transactions = pd.DataFrame({
+        't_dat': ['2019-10-01'],
+        'customer_id': ['cust_1'],
+        'article_id': [123],
+        'price': [0.01]
+    })
+    
+    cfe = CustomerFeatureEngineer(test_customers, test_transactions)
+
     result = cfe.calculate_rfm_and_behaviors(as_of_date='2019-10-31')
     assert result['days_since_last_purchase'].dtype == 'int64'
     assert result['num_purchases'].dtype == 'int64'
@@ -61,14 +82,23 @@ def test_rfm_with_single_customer():
         "customer_id": ['cust_1']
     })
     
-    fe = CustomerFeatureEngineer(test_customers, test_transactions)
-    result = fe.calculate_rfm_and_behaviors(as_of_date='2019-10-31')
+    cfe = CustomerFeatureEngineer(test_customers, test_transactions)
+    result = cfe.calculate_rfm_and_behaviors(as_of_date='2019-10-31')
     
     assert result.loc[result['customer_id'] == 'cust_1', 'days_since_last_purchase'].values[0] == 16 
     assert result.loc[result['customer_id'] == 'cust_1', 'num_purchases'].values[0] == 2
     assert result.loc[result['customer_id'] == 'cust_1', 'total_spent'].values[0] == 0.03
 
-def test_behavioral_features_returns_correct_columns(cfe):
+def test_behavioral_features_returns_correct_columns():
+    test_transactions = pd.DataFrame({
+        't_dat': ['2019-10-01', '2019-10-10', '2019-10-20'],
+        'customer_id': ['cust_1', 'cust_1', 'cust_1'],
+        'article_id': [123, 456, 789],
+        'price': [0.01, 0.02, 0.03]
+    })
+    test_customers = pd.DataFrame({'customer_id': ['cust_1']})
+    
+    cfe = CustomerFeatureEngineer(test_customers, test_transactions)
     result = cfe.calculate_rfm_and_behaviors(as_of_date='2019-10-31')
     
     assert 'customer_id' in result.columns
@@ -77,7 +107,16 @@ def test_behavioral_features_returns_correct_columns(cfe):
     assert 'price_std' in result.columns
 
 
-def test_behavioral_features_correct_types(cfe):
+def test_behavioral_features_correct_types():
+    test_transactions = pd.DataFrame({
+        't_dat': ['2019-10-01', '2019-10-10', '2019-10-20'],
+        'customer_id': ['cust_1', 'cust_1', 'cust_1'],
+        'article_id': [123, 456, 789],
+        'price': [0.01, 0.02, 0.03]
+    })
+    test_customers = pd.DataFrame({'customer_id': ['cust_1']})
+    
+    cfe = CustomerFeatureEngineer(test_customers, test_transactions)
     result = cfe.calculate_rfm_and_behaviors(as_of_date='2019-10-31')
     
     assert result['avg_transaction_value'].dtype == 'float64'

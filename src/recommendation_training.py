@@ -5,6 +5,10 @@ class RecommendationTrainingBuilder:
         self.transactions = transactions_df
         self.customer_features = customer_features_df
         self.product_features = product_features_df
+    def create_recommendation_data(self, prediction_start=None, prediction_end=None, negative_ratio=2, random_state=67):
+        positives = self._get_positive_examples(prediction_start, prediction_end)
+        negatives = self._sample_negative_examples(positives, negative_ratio=negative_ratio, random_state=random_state)
+        return pd.concat([positives, negatives], axis=0)
     
     def _get_positive_examples(self, prediction_start=None, prediction_end=None):
         if prediction_start == None:
@@ -37,12 +41,16 @@ class RecommendationTrainingBuilder:
         customer_ids = self.customer_features['customer_id'].unique()
         article_ids = self.product_features['article_id'].unique()
 
+        positives_per_customer = positives.groupby('customer_id').size()
+
         negative_examples = []
-        for customer in customer_ids:
+        for customer, num_positives in positives_per_customer.items():
+            num_negatives = num_positives * negative_ratio
+
             bought = positives[positives['customer_id'] == customer].values
 
             non_purchase_products = [art_id for art_id in article_ids if art_id not in bought]
-            sampled_products = pd.Series(non_purchase_products).sample(n=negative_ratio, random_state=random_state)
+            sampled_products = pd.Series(non_purchase_products).sample(n=num_negatives, random_state=random_state)
 
             for product in sampled_products:
                 negative_examples.append({

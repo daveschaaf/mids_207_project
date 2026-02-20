@@ -20,14 +20,14 @@ def test_customer_feature_engineer_init(cfe):
     assert pd.api.types.is_datetime64_any_dtype(cfe.transactions['t_dat'])
 
 def test_rfm_returns_correct_columns(cfe):
-    result = cfe.calculate_rfm(as_of_date='2019-10-31')
+    result = cfe.calculate_rfm_and_behaviors(as_of_date='2019-10-31')
     assert 'customer_id' in result.columns
     assert 'days_since_last_purchase' in result.columns
     assert 'num_purchases' in result.columns
     assert 'total_spent' in result.columns
 
 def test_rfm_correct_types(cfe):
-    result = cfe.calculate_rfm(as_of_date='2019-10-31')
+    result = cfe.calculate_rfm_and_behaviors(as_of_date='2019-10-31')
     assert result['days_since_last_purchase'].dtype == 'int64'
     assert result['num_purchases'].dtype == 'int64'
     assert result['total_spent'].dtype == 'float64'
@@ -44,14 +44,14 @@ def test_rfm_with_single_customer():
     })
     
     fe = CustomerFeatureEngineer(test_customers, test_transactions)
-    result = fe.calculate_rfm(as_of_date='2019-10-31')
+    result = fe.calculate_rfm_and_behaviors(as_of_date='2019-10-31')
     
     assert result.loc[result['customer_id'] == 'cust_1', 'days_since_last_purchase'].values[0] == 16 
     assert result.loc[result['customer_id'] == 'cust_1', 'num_purchases'].values[0] == 2
     assert result.loc[result['customer_id'] == 'cust_1', 'total_spent'].values[0] == 0.03
 
 def test_behavioral_features_returns_correct_columns(cfe):
-    result = cfe.calculate_behavioral_features(as_of_date='2019-10-31')
+    result = cfe.calculate_rfm_and_behaviors(as_of_date='2019-10-31')
     
     assert 'customer_id' in result.columns
     assert 'avg_transaction_value' in result.columns
@@ -60,7 +60,7 @@ def test_behavioral_features_returns_correct_columns(cfe):
 
 
 def test_behavioral_features_correct_types(cfe):
-    result = cfe.calculate_behavioral_features(as_of_date='2019-10-31')
+    result = cfe.calculate_rfm_and_behaviors(as_of_date='2019-10-31')
     
     assert result['avg_transaction_value'].dtype == 'float64'
     assert result['avg_days_between_purchases'].dtype == 'float64'
@@ -77,7 +77,7 @@ def test_behavioral_features_single_customer():
     test_customers = pd.DataFrame({'customer_id': ['cust_1']})
     
     cfe = CustomerFeatureEngineer(test_customers, test_transactions)
-    result = cfe.calculate_behavioral_features(as_of_date='2019-10-31')
+    result = cfe.calculate_rfm_and_behaviors(as_of_date='2019-10-31')
     customer_row = result[result['customer_id'] == 'cust_1'].iloc[0]
     
     assert customer_row['avg_transaction_value'] == 0.02
@@ -96,7 +96,7 @@ def test_behavioral_features_single_transaction():
     test_customers = pd.DataFrame({'customer_id': ['cust_1']})
     
     cfe = CustomerFeatureEngineer(test_customers, test_transactions)
-    result = cfe.calculate_behavioral_features(as_of_date='2019-10-31')
+    result = cfe.calculate_rfm_and_behaviors(as_of_date='2019-10-31')
     
     customer_row = result[result['customer_id'] == 'cust_1'].iloc[0]
     
@@ -116,6 +116,86 @@ def test_behavioral_features_no_transactions():
     test_customers = pd.DataFrame({'customer_id': ['cust_1']})
     
     cfe = CustomerFeatureEngineer(test_customers, test_transactions)
-    result = cfe.calculate_behavioral_features(as_of_date='2019-10-31')
+    result = cfe.calculate_rfm_and_behaviors(as_of_date='2019-10-31')
     
     assert len(result) == 0
+
+def test_category_preferences_returns_correct_columns():
+    test_transactions = pd.DataFrame({
+        't_dat': ['2019-10-01'],
+        'customer_id': ['cust_1'],
+        'article_id': [123]
+    })
+    test_articles = pd.DataFrame({
+        'article_id': [123],
+        'department_name': ['Jersey Basic'],
+        'garment_group_name': ['Jersey']
+    })
+    test_customers = pd.DataFrame({'customer_id': ['cust_1']})
+    
+    cfe = CustomerFeatureEngineer(test_customers, test_transactions)
+    result = cfe.calculate_category_preferences(
+        as_of_date='2019-10-31',
+        articles_df=test_articles
+    )
+    
+    assert 'customer_id' in result.columns
+    assert 'primary_department' in result.columns
+    assert 'primary_garment_group' in result.columns
+    assert 'category_diversity' in result.columns
+
+
+def test_category_preferences_single_category():
+    """Most common case - customer buys from one category"""
+    test_transactions = pd.DataFrame({
+        't_dat': ['2019-10-01', '2019-10-10'],
+        'customer_id': ['cust_1', 'cust_1'],
+        'article_id': [123, 456]
+    })
+    
+    test_articles = pd.DataFrame({
+        'article_id': [123, 456],
+        'department_name': ['Jersey Basic', 'Jersey Basic'],
+        'garment_group_name': ['Jersey', 'Jersey']
+    })
+    test_customers = pd.DataFrame({'customer_id': ['cust_1']})
+    
+    cfe = CustomerFeatureEngineer(test_customers, test_transactions)
+    result = cfe.calculate_category_preferences(
+        as_of_date='2019-10-31',
+        articles_df=test_articles
+    )
+    
+    customer_row = result[result['customer_id'] == 'cust_1'].iloc[0]
+    
+    assert customer_row['primary_department'] == 'Jersey Basic'
+    assert customer_row['primary_garment_group'] == 'Jersey'
+    assert customer_row['category_diversity'] == 1
+
+
+def test_category_preferences_multiple_categories():
+    """Customer buys from multiple categories - pick most common"""
+    test_transactions = pd.DataFrame({
+        't_dat': ['2019-10-01', '2019-10-10', '2019-10-15'],
+        'customer_id': ['cust_1', 'cust_1', 'cust_1'],
+        'article_id': [123, 456, 789]
+    })
+    
+    test_articles = pd.DataFrame({
+        'article_id': [123, 456, 789],
+        'department_name': ['Jersey Basic', 'Jersey Basic', 'Shoes'],
+        'garment_group_name': ['Jersey', 'Jersey', 'Footwear']
+    })
+    test_customers = pd.DataFrame({'customer_id': ['cust_1']})
+    
+    cfe = CustomerFeatureEngineer(test_customers, test_transactions)
+    result = cfe.calculate_category_preferences(
+        as_of_date='2019-10-31',
+        articles_df=test_articles
+    )
+    
+    customer_row = result[result['customer_id'] == 'cust_1'].iloc[0]
+    
+    assert customer_row['primary_department'] == 'Jersey Basic'  # 2 out of 3
+    assert customer_row['primary_garment_group'] == 'Jersey'
+    assert customer_row['category_diversity'] == 2  # Jersey Basic + Shoes

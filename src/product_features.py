@@ -63,6 +63,7 @@ class ProductFeatureEngineer:
             min_price = ('price', 'min'),
             max_price = ('price', 'max')
         ).reset_index()
+        agg_data = agg_data.rename(columns={'price_std': 'product_price_std'})
         
         return agg_data
     def calculate_all_features(self, as_of_date=None):

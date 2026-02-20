@@ -36,6 +36,7 @@ class CustomerFeatureEngineer:
         
         agg_data = agg_data.drop('last_purchase_date', axis=1)
         agg_data = agg_data.drop('first_purchase_date', axis=1)
+        agg_data = agg_data.rename(columns={'price_std': 'customer_price_std'})
 
         return agg_data
 

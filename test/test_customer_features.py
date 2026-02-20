@@ -85,7 +85,7 @@ def test_behavioral_features_returns_correct_columns():
     assert 'customer_id' in result.columns
     assert 'avg_transaction_value' in result.columns
     assert 'avg_days_between_purchases' in result.columns
-    assert 'price_std' in result.columns
+    assert 'customer_price_std' in result.columns
 
 
 def test_behavioral_features_correct_types():
@@ -102,7 +102,7 @@ def test_behavioral_features_correct_types():
     
     assert result['avg_transaction_value'].dtype == 'float64'
     assert result['avg_days_between_purchases'].dtype == 'float64'
-    assert result['price_std'].dtype == 'float64'
+    assert result['customer_price_std'].dtype == 'float64'
 
 
 def test_behavioral_features_single_customer():
@@ -121,7 +121,7 @@ def test_behavioral_features_single_customer():
     assert customer_row['avg_transaction_value'] == 0.02
     assert customer_row['avg_days_between_purchases'] == 9.5
     expected_std = np.std([0.01, 0.02, 0.03], ddof=1)
-    assert np.isclose(customer_row['price_std'], expected_std)
+    assert np.isclose(customer_row['customer_price_std'], expected_std)
 
 def test_behavioral_features_single_transaction():
     """Customer with only 1 purchase - can't calculate days between or std"""
@@ -140,7 +140,7 @@ def test_behavioral_features_single_transaction():
     
     assert customer_row['avg_transaction_value'] == 0.02
     assert pd.isna(customer_row['avg_days_between_purchases']) or customer_row['avg_days_between_purchases'] == 0
-    assert pd.isna(customer_row['price_std']) or customer_row['price_std'] == 0
+    assert pd.isna(customer_row['customer_price_std']) or customer_row['customer_price_std'] == 0
 
 
 def test_behavioral_features_no_transactions():
@@ -250,7 +250,7 @@ def test_calculate_all_features_integration(real_data):
     # Check structure
     expected_columns = [
         'customer_id', 'days_since_last_purchase', 'num_purchases', 
-        'total_spent', 'avg_transaction_value', 'price_std',
+        'total_spent', 'avg_transaction_value', 'customer_price_std',
         'avg_days_between_purchases', 'primary_department',
         'primary_garment_group', 'category_diversity'
     ]

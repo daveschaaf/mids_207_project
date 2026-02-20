@@ -115,7 +115,7 @@ def test_price_features_single_product():
     assert product_row['avg_price'] == 0.02  # mean([0.01, 0.02, 0.03])
     assert product_row['min_price'] == 0.01
     assert product_row['max_price'] == 0.03
-    assert np.isclose(product_row['price_std'], np.std([0.01, 0.02, 0.03], ddof=1))
+    assert np.isclose(product_row['product_price_std'], np.std([0.01, 0.02, 0.03], ddof=1))
 
 def test_product_all_features_integration(real_data):
     """Integration test using actual H&M data"""
@@ -125,7 +125,7 @@ def test_product_all_features_integration(real_data):
         'article_id', 
         'sales_last_7_days', 'sales_last_30_days', 
         'days_since_first_sale', 'days_since_last_sale',
-        'avg_price', 'price_std', 'min_price', 'max_price'
+        'avg_price', 'product_price_std', 'min_price', 'max_price'
     ]
     for col in expected_columns:
         assert col in result.columns, f"Missing column: {col}"
@@ -142,5 +142,5 @@ def test_product_all_features_integration(real_data):
     assert ((result['min_price'] <= result['avg_price'] + tolerance)).all()
     assert ((result['max_price'] >= result['avg_price'] - tolerance)).all()
 
-    products_with_nan_std = result[result['price_std'].isna()]
+    products_with_nan_std = result[result['product_price_std'].isna()]
     print(f"\n{len(products_with_nan_std)} products have NaN price_std (likely single sale)")

@@ -46,14 +46,9 @@ def test_popularity_no_recent_sales():
     
     product_row = result[result['article_id'] == 123].iloc[0]
     
-    # No sales in last 7 or 30 days
     assert product_row['sales_last_7_days'] == 0
     assert product_row['sales_last_30_days'] == 0
-    
-    # Days since first sale: Oct 31 - Aug 1 = 91 days
     assert product_row['days_since_first_sale'] == 91
-    
-    # Days since last sale: Oct 31 - Aug 15 = 77 days
     assert product_row['days_since_last_sale'] == 77
 
 
@@ -121,3 +116,31 @@ def test_price_features_single_product():
     assert product_row['min_price'] == 0.01
     assert product_row['max_price'] == 0.03
     assert np.isclose(product_row['price_std'], np.std([0.01, 0.02, 0.03], ddof=1))
+
+def test_product_all_features_integration(real_data):
+    """Integration test using actual H&M data"""
+    pfe = ProductFeatureEngineer(real_data['articles'], real_data['transactions'])
+    result = pfe.calculate_all_features(as_of_date='2019-10-31')
+    expected_columns = [
+        'article_id', 
+        'sales_last_7_days', 'sales_last_30_days', 
+        'days_since_first_sale', 'days_since_last_sale',
+        'avg_price', 'price_std', 'min_price', 'max_price'
+    ]
+    for col in expected_columns:
+        assert col in result.columns, f"Missing column: {col}"
+    
+    assert len(result) > 0
+
+    assert (result['sales_last_7_days'] >= 0).all()
+    assert (result['sales_last_30_days'] >= result['sales_last_7_days']).all()
+    assert (result['days_since_first_sale'] >= 0).all()
+    assert (result['days_since_last_sale'] >= 0).all()
+    assert (result['avg_price'] > 0).all()
+
+    tolerance = 1e-9
+    assert ((result['min_price'] <= result['avg_price'] + tolerance)).all()
+    assert ((result['max_price'] >= result['avg_price'] - tolerance)).all()
+
+    products_with_nan_std = result[result['price_std'].isna()]
+    print(f"\n{len(products_with_nan_std)} products have NaN price_std (likely single sale)")

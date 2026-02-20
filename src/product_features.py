@@ -65,3 +65,11 @@ class ProductFeatureEngineer:
         ).reset_index()
         
         return agg_data
+    def calculate_all_features(self, as_of_date=None):
+        """Combine popularity and price features"""
+        popularity = self.calculate_popularity(as_of_date=as_of_date)
+        price_features = self.calculate_price_features(as_of_date=as_of_date)
+        
+        all_features = popularity.merge(price_features, on='article_id', how='left')
+        
+        return all_features

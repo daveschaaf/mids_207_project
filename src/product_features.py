@@ -51,4 +51,17 @@ class ProductFeatureEngineer:
         - min_price
         - max_price
         """
-        pass
+        if as_of_date==None:
+            as_of_date = self.transactions['t_dat'].max()
+        as_of_date = pd.to_datetime(as_of_date)
+
+        relevant_txn = self.transactions[self.transactions['t_dat'] <= as_of_date]
+        
+        agg_data = relevant_txn.groupby('article_id').agg(
+            avg_price = ('price', 'mean'),
+            price_std = ('price', 'std'),
+            min_price = ('price', 'min'),
+            max_price = ('price', 'max')
+        ).reset_index()
+        
+        return agg_data

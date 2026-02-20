@@ -1,5 +1,6 @@
 import pytest
 import pandas as pd
+import numpy as np
 from src.product_features import ProductFeatureEngineer
 
 
@@ -99,3 +100,24 @@ def test_popularity_product_never_sold():
     
     assert 123 in result['article_id'].values
     assert 456 not in result['article_id'].values
+
+
+def test_price_features_single_product():
+    test_transactions = pd.DataFrame({
+        't_dat': ['2019-10-01', '2019-10-15', '2019-10-25'],
+        'customer_id': ['c1', 'c2', 'c3'],
+        'article_id': [123, 123, 123],
+        'price': [0.01, 0.02, 0.03]
+    })
+    
+    test_articles = pd.DataFrame({'article_id': [123]})
+    
+    pfe = ProductFeatureEngineer(test_articles, test_transactions)
+    result = pfe.calculate_price_features(as_of_date='2019-10-31')
+    
+    product_row = result[result['article_id'] == 123].iloc[0]
+    
+    assert product_row['avg_price'] == 0.02  # mean([0.01, 0.02, 0.03])
+    assert product_row['min_price'] == 0.01
+    assert product_row['max_price'] == 0.03
+    assert np.isclose(product_row['price_std'], np.std([0.01, 0.02, 0.03], ddof=1))

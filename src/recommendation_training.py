@@ -5,7 +5,7 @@ class RecommendationTrainingBuilder:
         self.transactions = transactions_df
         self.customer_features = customer_features_df
         self.product_features = product_features_df
-    def create_recommendation_data(self, prediction_start=None, prediction_end=None, negative_ratio=2, random_state=67):
+    def build_dataset(self, prediction_start=None, prediction_end=None, negative_ratio=2, random_state=67):
         positives = self._get_positive_examples(prediction_start, prediction_end)
         negatives = self._sample_negative_examples(positives, negative_ratio=negative_ratio, random_state=random_state)
         return pd.concat([positives, negatives], axis=0)

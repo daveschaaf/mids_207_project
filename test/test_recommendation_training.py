@@ -113,7 +113,7 @@ def test_sample_negative_examples():
     assert 'days_since_last_purchase' in negatives.columns
     assert 'avg_price' in negatives.columns
 
-def test_create_recommendation_data_integration(real_data):
+def test_build_dataset_integration(real_data):
     """Integration test: create full training dataset with real H&M data"""
     
     sample_size = 1000
@@ -133,7 +133,7 @@ def test_create_recommendation_data_integration(real_data):
         product_features
     )
     
-    training_data = builder.create_recommendation_data(
+    training_data = builder.build_dataset(
         prediction_start='2019-10-01',
         prediction_end='2019-10-31',
         negative_ratio=5,

@@ -68,6 +68,18 @@ class CustomerFeatureEngineer:
         ).reset_index()
 
         return category_df
+    def calculate_all_features(self, articles_df, as_of_date=None):
+        rfm_behaviors = self.calculate_rfm_and_behaviors(as_of_date)
+        categories = self.calculate_category_preferences(articles_df, as_of_date)
+
+        all_features = rfm_behaviors.merge(
+            categories,
+            on='customer_id',
+            how = 'left'
+        ).reset_index()
+
+        return all_features
+
         
 
     def set_dtypes(self):

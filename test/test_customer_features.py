@@ -4,14 +4,32 @@ import numpy as np
 from src.customer_features import CustomerFeatureEngineer
 from pathlib import Path
 
-data_path = Path("./data")
-customers_path = data_path / 'customer_hm_cleaned.csv'
-transactions_path = data_path / 'transactions_hm_cleaned.csv'
-customers_df = pd.read_csv(customers_path)
-transactions_df = pd.read_csv(transactions_path)
 
 @pytest.fixture
-def cfe():
+def real_data():
+    """Load real H&M data for integration tests"""
+    data_path = Path("./data")
+    
+    if not data_path.exists():
+        pytest.skip("Data directory not found - skipping integration test")
+    
+    customers_path = data_path / 'customer_hm_cleaned.csv'
+    transactions_path = data_path / 'transactions_hm_cleaned.csv'
+    articles_path = data_path / 'articles_hm_cleaned.csv'
+    
+    if not all([customers_path.exists(), transactions_path.exists(), articles_path.exists()]):
+        pytest.skip("Data files not found - skipping integration test")
+    
+    return {
+        'customers': pd.read_csv(customers_path),
+        'transactions': pd.read_csv(transactions_path),
+        'articles': pd.read_csv(articles_path)
+    }
+
+@pytest.fixture
+def cfe(real_data):
+    customers_df = real_data['customers']
+    transactions_df = real_data['transactions']
     return CustomerFeatureEngineer(customers_df, transactions_df)
 
 def test_customer_feature_engineer_init(cfe):
@@ -199,3 +217,31 @@ def test_category_preferences_multiple_categories():
     assert customer_row['primary_department'] == 'Jersey Basic'  # 2 out of 3
     assert customer_row['primary_garment_group'] == 'Jersey'
     assert customer_row['category_diversity'] == 2  # Jersey Basic + Shoes
+
+
+def test_calculate_all_features_integration(real_data):
+    """Integration test using actual H&M data"""
+    cfe = CustomerFeatureEngineer(real_data['customers'], real_data['transactions'])
+    result = cfe.calculate_all_features(
+        articles_df=real_data['articles'], 
+        as_of_date='2019-10-31'
+    )
+    
+    # Check structure
+    expected_columns = [
+        'customer_id', 'days_since_last_purchase', 'num_purchases', 
+        'total_spent', 'avg_transaction_value', 'price_std',
+        'avg_days_between_purchases', 'primary_department',
+        'primary_garment_group', 'category_diversity'
+    ]
+    for col in expected_columns:
+        assert col in result.columns, f"Missing column: {col}"
+    
+    # Check we got results
+    assert len(result) > 0
+    assert len(result) <= len(real_data['customers'])
+    
+    # Check data quality
+    assert (result['num_purchases'] >= 1).all()
+    assert (result['days_since_last_purchase'] >= 0).all()
+    assert (result['category_diversity'] >= 1).all()

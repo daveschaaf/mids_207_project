@@ -30,7 +30,7 @@ class ProductFeatureEngineer:
         sale_dates = relevant_txn.groupby('article_id').agg(
             first_sale_date=('t_dat', 'min'),
             last_sale_date=('t_dat', 'max')
-        ).reset_index()
+        ).reset_index(drop=True)
         
         popularity = sale_dates.merge(sales_7d, on='article_id', how='left')
         popularity = popularity.merge(sales_30d, on='article_id', how='left')
@@ -62,7 +62,7 @@ class ProductFeatureEngineer:
             price_std = ('price', 'std'),
             min_price = ('price', 'min'),
             max_price = ('price', 'max')
-        ).reset_index()
+        ).reset_index(drop=True)
         agg_data = agg_data.rename(columns={'price_std': 'product_price_std'})
         
         return agg_data

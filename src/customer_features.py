@@ -28,7 +28,7 @@ class CustomerFeatureEngineer:
             price_std = ('price', 'std'),
             num_purchases = ('t_dat', 'count'),
             total_spent = ('price','sum')
-        ).reset_index()
+        ).reset_index(drop=True)
 
         agg_data['days_since_last_purchase'] = (as_of_date - agg_data['last_purchase_date']).dt.days
         agg_data['avg_transaction_value'] = agg_data['total_spent'] / agg_data['num_purchases']
@@ -66,7 +66,7 @@ class CustomerFeatureEngineer:
             primary_department = ('department_name', category_mode),
             primary_garment_group = ('garment_group_name', category_mode),
             category_diversity = ('department_name', 'nunique')
-        ).reset_index()
+        ).reset_index(drop=True)
 
         return category_df
     def calculate_all_features(self, articles_df, as_of_date=None):
@@ -77,7 +77,7 @@ class CustomerFeatureEngineer:
             categories,
             on='customer_id',
             how = 'left'
-        ).reset_index()
+        ).reset_index(drop=True)
 
         return all_features
 

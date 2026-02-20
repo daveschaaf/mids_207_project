@@ -1,5 +1,6 @@
 import pytest
 import pandas as pd
+import numpy as np
 from src.customer_features import CustomerFeatureEngineer
 from pathlib import Path
 
@@ -48,3 +49,73 @@ def test_rfm_with_single_customer():
     assert result.loc[result['customer_id'] == 'cust_1', 'days_since_last_purchase'].values[0] == 16 
     assert result.loc[result['customer_id'] == 'cust_1', 'num_purchases'].values[0] == 2
     assert result.loc[result['customer_id'] == 'cust_1', 'total_spent'].values[0] == 0.03
+
+def test_behavioral_features_returns_correct_columns(cfe):
+    result = cfe.calculate_behavioral_features(as_of_date='2019-10-31')
+    
+    assert 'customer_id' in result.columns
+    assert 'avg_transaction_value' in result.columns
+    assert 'avg_days_between_purchases' in result.columns
+    assert 'price_std' in result.columns
+
+
+def test_behavioral_features_correct_types(cfe):
+    result = cfe.calculate_behavioral_features(as_of_date='2019-10-31')
+    
+    assert result['avg_transaction_value'].dtype == 'float64'
+    assert result['avg_days_between_purchases'].dtype == 'float64'
+    assert result['price_std'].dtype == 'float64'
+
+
+def test_behavioral_features_single_customer():
+    test_transactions = pd.DataFrame({
+        't_dat': ['2019-10-01', '2019-10-10', '2019-10-20'],
+        'customer_id': ['cust_1', 'cust_1', 'cust_1'],
+        'article_id': [123, 456, 789],
+        'price': [0.01, 0.02, 0.03]
+    })
+    test_customers = pd.DataFrame({'customer_id': ['cust_1']})
+    
+    cfe = CustomerFeatureEngineer(test_customers, test_transactions)
+    result = cfe.calculate_behavioral_features(as_of_date='2019-10-31')
+    customer_row = result[result['customer_id'] == 'cust_1'].iloc[0]
+    
+    assert customer_row['avg_transaction_value'] == 0.02
+    assert customer_row['avg_days_between_purchases'] == 9.5
+    expected_std = np.std([0.01, 0.02, 0.03], ddof=1)
+    assert np.isclose(customer_row['price_std'], expected_std)
+
+def test_behavioral_features_single_transaction():
+    """Customer with only 1 purchase - can't calculate days between or std"""
+    test_transactions = pd.DataFrame({
+        't_dat': ['2019-10-15'],
+        'customer_id': ['cust_1'],
+        'article_id': [123],
+        'price': [0.02]
+    })
+    test_customers = pd.DataFrame({'customer_id': ['cust_1']})
+    
+    cfe = CustomerFeatureEngineer(test_customers, test_transactions)
+    result = cfe.calculate_behavioral_features(as_of_date='2019-10-31')
+    
+    customer_row = result[result['customer_id'] == 'cust_1'].iloc[0]
+    
+    assert customer_row['avg_transaction_value'] == 0.02
+    assert pd.isna(customer_row['avg_days_between_purchases']) or customer_row['avg_days_between_purchases'] == 0
+    assert pd.isna(customer_row['price_std']) or customer_row['price_std'] == 0
+
+
+def test_behavioral_features_no_transactions():
+    """Customer with no purchases in time window"""
+    test_transactions = pd.DataFrame({
+        't_dat': [],
+        'customer_id': [],
+        'article_id': [],
+        'price': []
+    })
+    test_customers = pd.DataFrame({'customer_id': ['cust_1']})
+    
+    cfe = CustomerFeatureEngineer(test_customers, test_transactions)
+    result = cfe.calculate_behavioral_features(as_of_date='2019-10-31')
+    
+    assert len(result) == 0

@@ -117,6 +117,22 @@ def test_price_features_single_product():
     assert product_row['max_price'] == 0.03
     assert np.isclose(product_row['product_price_std'], np.std([0.01, 0.02, 0.03], ddof=1))
 
+def test_product_all_features_no_nans():
+    """Ensure calculate_all_features returns no NaN values"""
+    test_transactions = pd.DataFrame({
+        't_dat': pd.to_datetime(['2019-10-01']),
+        'customer_id': ['c1'],
+        'article_id': [123],
+        'price': [0.02]
+    })
+    
+    test_articles = pd.DataFrame({'article_id': [123]})
+    
+    pfe = ProductFeatureEngineer(test_articles, test_transactions)
+    result = pfe.calculate_all_features(as_of_date='2019-10-31')
+    nan_count = result.isna().sum().sum()
+    assert nan_count == 0, f"Found {nan_count} NaN values in product features"
+
 def test_product_all_features_integration(real_data):
     """Integration test using actual H&M data"""
     pfe = ProductFeatureEngineer(real_data['articles'], real_data['transactions'])
@@ -131,7 +147,12 @@ def test_product_all_features_integration(real_data):
         assert col in result.columns, f"Missing column: {col}"
     
     assert len(result) > 0
-
+    numeric_cols = ['sales_last_7_days', 'sales_last_30_days', 
+                    'days_since_first_sale', 'days_since_last_sale',
+                    'avg_price', 'product_price_std', 'min_price', 'max_price']
+    for col in numeric_cols:
+        nan_count = result[col].isna().sum()
+        assert nan_count == 0, f"Found {nan_count} NaN values in {col}"
     assert (result['sales_last_7_days'] >= 0).all()
     assert (result['sales_last_30_days'] >= result['sales_last_7_days']).all()
     assert (result['days_since_first_sale'] >= 0).all()
@@ -141,6 +162,3 @@ def test_product_all_features_integration(real_data):
     tolerance = 1e-9
     assert ((result['min_price'] <= result['avg_price'] + tolerance)).all()
     assert ((result['max_price'] >= result['avg_price'] - tolerance)).all()
-
-    products_with_nan_std = result[result['product_price_std'].isna()]
-    print(f"\n{len(products_with_nan_std)} products have NaN price_std (likely single sale)")

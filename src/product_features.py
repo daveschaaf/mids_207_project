@@ -37,9 +37,15 @@ class ProductFeatureEngineer:
         
         popularity['sales_last_7_days'] = popularity['sales_last_7_days'].fillna(0).astype(int)
         popularity['sales_last_30_days'] = popularity['sales_last_30_days'].fillna(0).astype(int)
-        popularity['days_since_first_sale'] = (as_of_date - popularity['first_sale_date']).dt.days
-        popularity['days_since_last_sale'] = (as_of_date - popularity['last_sale_date']).dt.days
+
+        # fillna with 0, treat it like a brand new product with no history
+        popularity['days_since_first_sale'] = (as_of_date - popularity['first_sale_date']).dt.days.fillna(0).astype(int)
         
+        # fillna with max, treat it like an inactive product
+        popularity['days_since_last_sale'] = (as_of_date - popularity['last_sale_date']).dt.days.astype(int)
+        max_last_sale = popularity['days_since_last_sale'].max() + 1
+        popularity['days_since_last_sale'] = popularity['days_since_last_sale'].fillna(max_last_sale)
+
         popularity = popularity.drop(['first_sale_date', 'last_sale_date'], axis=1)
 
         return popularity
@@ -47,7 +53,7 @@ class ProductFeatureEngineer:
     def calculate_price_features(self, as_of_date=None):
         """
         - avg_price
-        - price_std
+        - product_price_std
         - min_price
         - max_price
         """
@@ -59,12 +65,18 @@ class ProductFeatureEngineer:
         
         agg_data = relevant_txn.groupby('article_id').agg(
             avg_price = ('price', 'mean'),
-            price_std = ('price', 'std'),
             min_price = ('price', 'min'),
-            max_price = ('price', 'max')
+            max_price = ('price', 'max'),
+            product_price_std = ('price', 'std'),
         ).reset_index()
-        agg_data = agg_data.rename(columns={'price_std': 'product_price_std'})
-        
+
+
+        global_avg_price = relevant_txn['price'].mean()
+        agg_data['avg_price'] = agg_data['avg_price'].fillna(global_avg_price)
+        agg_data['min_price'] = agg_data['min_price'].fillna(global_avg_price)
+        agg_data['max_price'] = agg_data['max_price'].fillna(global_avg_price)
+        agg_data['product_price_std'] = agg_data['product_price_std'].fillna(0)
+
         return agg_data
 
     def calculate_all_features(self, as_of_date=None):

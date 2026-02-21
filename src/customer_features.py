@@ -13,7 +13,7 @@ class CustomerFeatureEngineer:
         num_purchases
         total_spent
         avg_transaction_value
-        price_std
+        customer_price_std
         avg_days_between purchases
         """
         if as_of_date == None:
@@ -25,18 +25,27 @@ class CustomerFeatureEngineer:
         agg_data = relevant_txn.groupby('customer_id').agg(
             first_purchase_date = ('t_dat', 'min'),
             last_purchase_date = ('t_dat', 'max'),
-            price_std = ('price', 'std'),
+            customer_price_std = ('price', 'std'),
             num_purchases = ('t_dat', 'count'),
             total_spent = ('price','sum')
         ).reset_index()
-
+       
+        # Low numbers are good, so we fill with the max value + 1
         agg_data['days_since_last_purchase'] = (as_of_date - agg_data['last_purchase_date']).dt.days
-        agg_data['avg_transaction_value'] = agg_data['total_spent'] / agg_data['num_purchases']
-        agg_data['avg_days_between_purchases'] = (agg_data['last_purchase_date'] - agg_data['first_purchase_date']).dt.days / (agg_data['num_purchases']-1)
+        max_recency = agg_data['days_since_last_purchase'].max() + 1
+        agg_data['days_since_last_purchase'] = agg_data['days_since_last_purchase'].fillna(max_recency) 
         
+        agg_data['avg_transaction_value'] = (agg_data['total_spent'] / agg_data['num_purchases']).fillna(0)
+        
+        # days between purchases is also better at lower so fill with max + 1
+        agg_data['avg_days_between_purchases'] = (agg_data['last_purchase_date'] - agg_data['first_purchase_date']).dt.days / (agg_data['num_purchases']-1)
+        # fillna with the max doesn't work when for one purchase only 0 / 0
+        agg_data['avg_days_between_purchases'] = agg_data['avg_days_between_purchases'].fillna(999)
+
+        agg_data['customer_price_std'] = agg_data['customer_price_std'].fillna(0)
+
         agg_data = agg_data.drop('last_purchase_date', axis=1)
         agg_data = agg_data.drop('first_purchase_date', axis=1)
-        agg_data = agg_data.rename(columns={'price_std': 'customer_price_std'})
 
         return agg_data
 

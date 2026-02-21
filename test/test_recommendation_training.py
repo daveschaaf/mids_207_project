@@ -116,7 +116,7 @@ def test_sample_negative_examples():
 def test_build_dataset_integration(real_data):
     """Integration test: create full training dataset with real H&M data"""
     
-    sample_size = 1000
+    sample_size = 10000
     transactions_sample = real_data['transactions'].sample(n=sample_size, random_state=42)
     cfe = CustomerFeatureEngineer(real_data['customers'], transactions_sample)
     customer_features = cfe.calculate_all_features(
@@ -132,7 +132,6 @@ def test_build_dataset_integration(real_data):
         customer_features,
         product_features
     )
-    
     training_data = builder.build_dataset(
         prediction_start='2019-10-01',
         prediction_end='2019-10-31',
@@ -147,6 +146,11 @@ def test_build_dataset_integration(real_data):
     assert 'num_purchases' in training_data.columns
     assert 'sales_last_7_days' in training_data.columns
     assert 'avg_price' in training_data.columns
+    feature_cols = [col for col in training_data.columns 
+                    if col not in ['customer_id', 'article_id', 'purchased']]
+    for col in feature_cols:
+        nan_count = training_data[col].isna().sum()
+        assert nan_count == 0, f"Found {nan_count} NaN values in {col}"
     num_positives = (training_data['purchased'] == 1).sum()
     num_negatives = (training_data['purchased'] == 0).sum()
     assert num_negatives / num_positives >= 4.5

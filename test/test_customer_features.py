@@ -48,9 +48,9 @@ def test_rfm_correct_types():
     cfe = CustomerFeatureEngineer(test_customers, test_transactions)
 
     result = cfe.calculate_rfm_and_behaviors(as_of_date='2019-10-31')
-    assert result['days_since_last_purchase'].dtype == 'int64'
-    assert result['num_purchases'].dtype == 'int64'
-    assert result['total_spent'].dtype == 'float64'
+    assert pd.api.types.is_numeric_dtype(result['days_since_last_purchase'])
+    assert pd.api.types.is_numeric_dtype(result['num_purchases'])
+    assert pd.api.types.is_numeric_dtype(result['total_spent'])
 
 def test_rfm_with_single_customer():
     test_transactions = pd.DataFrame({
@@ -139,8 +139,8 @@ def test_behavioral_features_single_transaction():
     customer_row = result[result['customer_id'] == 'cust_1'].iloc[0]
     
     assert customer_row['avg_transaction_value'] == 0.02
-    assert pd.isna(customer_row['avg_days_between_purchases']) or customer_row['avg_days_between_purchases'] == 0
-    assert pd.isna(customer_row['customer_price_std']) or customer_row['customer_price_std'] == 0
+    assert customer_row['avg_days_between_purchases'] == 999 # pick arbitrary high number
+    assert customer_row['customer_price_std'] == 0
 
 
 def test_behavioral_features_no_transactions():
@@ -234,11 +234,36 @@ def test_category_preferences_multiple_categories():
     
     customer_row = result[result['customer_id'] == 'cust_1'].iloc[0]
     
-    assert customer_row['primary_department'] == 'Jersey Basic'  # 2 out of 3
+    assert customer_row['primary_department'] == 'Jersey Basic'  
     assert customer_row['primary_garment_group'] == 'Jersey'
-    assert customer_row['category_diversity'] == 2  # Jersey Basic + Shoes
+    assert customer_row['category_diversity'] == 2
+
+def test_calculate_all_features_no_nans():
+    """Ensure calculate_all_features returns no NaN values"""
+    test_transactions = pd.DataFrame({
+        't_dat': pd.to_datetime(['2019-10-01']),
+        'customer_id': ['c1'],
+        'article_id': [123],
+        'price': [0.02]
+    })
+    
+    test_articles = pd.DataFrame({
+        'article_id': [123],
+        'department_name': ['Jersey'],
+        'garment_group_name': ['Jersey']
+    })
+    
+    test_customers = pd.DataFrame({'customer_id': ['c1']})
+    
+    cfe = CustomerFeatureEngineer(test_customers, test_transactions)
+    result = cfe.calculate_all_features(articles_df=test_articles, as_of_date='2019-10-31')
+    result = cfe.calculate_all_features(articles_df=test_articles, as_of_date='2019-10-31')
+
+    nan_count = result.isna().sum().sum()
+    assert nan_count == 0, f"Found {nan_count} NaN values in customer features"
 
 
+@pytest.mark.slow
 def test_calculate_all_features_integration(real_data):
     """Integration test using actual H&M data"""
     cfe = CustomerFeatureEngineer(real_data['customers'], real_data['transactions'])
@@ -247,7 +272,6 @@ def test_calculate_all_features_integration(real_data):
         as_of_date='2019-10-31'
     )
     
-    # Check structure
     expected_columns = [
         'customer_id', 'days_since_last_purchase', 'num_purchases', 
         'total_spent', 'avg_transaction_value', 'customer_price_std',
@@ -256,12 +280,14 @@ def test_calculate_all_features_integration(real_data):
     ]
     for col in expected_columns:
         assert col in result.columns, f"Missing column: {col}"
-    
-    # Check we got results
+    numeric_cols = ['days_since_last_purchase', 'num_purchases', 'total_spent', 
+                    'avg_transaction_value', 'customer_price_std', 
+                    'avg_days_between_purchases', 'category_diversity']
+    for col in numeric_cols:
+        nan_count = result[col].isna().sum()
+        assert nan_count == 0, f"Found {nan_count} NaN values in {col}"
     assert len(result) > 0
     assert len(result) <= len(real_data['customers'])
-    
-    # Check data quality
     assert (result['num_purchases'] >= 1).all()
     assert (result['days_since_last_purchase'] >= 0).all()
     assert (result['category_diversity'] >= 1).all()

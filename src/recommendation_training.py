@@ -6,6 +6,23 @@ class RecommendationTrainingBuilder:
         self.customer_features = customer_features_df
         self.product_features = product_features_df
     def build_dataset(self, prediction_start=None, prediction_end=None, negative_ratio=2, random_state=67):
+        """
+        Creates a data set of customer-product pairs
+        
+        Outcome variable:
+        purchased
+        - 1 = purchased during the prediction period
+        - 0 = did NOT purchase during the prediction period
+
+        Method: build_dataset
+        builds product and customer features
+        prediction_start = Begin prediction period
+        prediction_end = End of prediction period
+        negative_ratio = Ratio of random pairs of customer-product that did not result in a transaction
+
+        Returns:
+            pd.DataFrame of features and outcome
+        """
         positives = self._get_positive_examples(prediction_start, prediction_end)
         negatives = self._sample_negative_examples(positives, negative_ratio=negative_ratio, random_state=random_state)
         return pd.concat([positives, negatives], axis=0)

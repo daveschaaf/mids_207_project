@@ -1,3 +1,6 @@
 __pycache__/
 .DS_Store
 .vscode/
+
+EDA_DATACLEANING/*.csv
+.DS_Store

@@ -27,7 +27,11 @@ class CustomerFeatureEngineer:
             total_spent = ('price','sum')
         ).reset_index()
 
-        agg_data = self.customers[['customer_id']].merge(
+        customer_cols = ['customer_id']
+        if 'age' in self.customers.columns:
+            customer_cols.append('age')
+
+        agg_data = self.customers[customer_cols].merge(
             agg_data,
             on='customer_id',
             how='left'

@@ -57,7 +57,7 @@ class RecommendationTrainingBuilder:
         rng = np.random.default_rng(random_state)
 
         article_ids = self.product_features['article_id'].unique()
-        customer_ids = self.customer_features['customer_id'].unique()
+        customer_ids = positives['customer_id'].unique()
 
         positives_per_customer = positives.groupby('customer_id').size()
 

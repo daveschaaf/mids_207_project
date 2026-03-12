@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 class RecommendationTrainingBuilder:
     def __init__(self, transactions_df, customer_features_df, product_features_df):
@@ -53,25 +54,32 @@ class RecommendationTrainingBuilder:
         return positives
     
     def _sample_negative_examples(self, positives, negative_ratio=2, random_state=67):
+        rng = np.random.default_rng(random_state)
+
         article_ids = self.product_features['article_id'].unique()
+        customer_ids = self.customer_features['customer_id'].unique()
 
         positives_per_customer = positives.groupby('customer_id').size()
 
         negative_examples = []
-        for customer, num_positives in positives_per_customer.items():
+        for customer in customer_ids:
+            num_positives = positives_per_customer[customer]
             num_negatives = num_positives * negative_ratio
+
             bought = positives[positives['customer_id'] == customer]['article_id'].values
-
-            non_purchase_products = [art_id for art_id in article_ids if art_id not in bought]
-
-            sampled_products = pd.Series(non_purchase_products).sample(n=num_negatives, random_state=random_state)
-
-            for product in sampled_products:
-                negative_examples.append({
+            buffer_size = min(num_negatives*2, len(article_ids))
+            sampled_articles = rng.choice(article_ids, size=buffer_size, replace=False)
+            sampled_articles = sampled_articles[~np.isin(sampled_articles, list(bought))][:num_negatives]
+            
+            negative_examples.extend(
+                {
                     'customer_id': customer,
                     'article_id': product,
                     'purchased': 0
-                })
+                }
+                for product in sampled_articles
+            )
+
         negatives = pd.DataFrame(negative_examples)
         negatives = negatives.merge(
             self.product_features,

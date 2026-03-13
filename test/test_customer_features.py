@@ -93,7 +93,8 @@ def test_calculate_cold_start_features():
         'FN': [1, 0, 0],
         'Active': [1, 1, 0],
         'club_member_status': ['ACTIVE', 'PRE-CREATE', 'LEFT CLUB'],
-        'fashion_news_frequency': ['REGULARLY', 'NONE', 'MONTHLY']
+        'fashion_news_frequency': ['REGULARLY', 'NONE', 'MONTHLY'],
+        'age': [25, 35, 45]
     })
     
     # c3 has no transactions before as_of_date
@@ -120,6 +121,8 @@ def test_calculate_cold_start_features():
     assert 'fashion_news_frequency_REGULARLY' in result.columns
     assert 'fashion_news_frequency_MONTHLY' not in result.columns
     assert 'fashion_news_frequency_NONE' not in result.columns
+
+    assert 'age' not in result.columns
     
     assert result.isna().sum().sum() == 0
 
@@ -320,6 +323,35 @@ def test_calculate_all_features_no_nans():
     nan_count = result.isna().sum().sum()
     assert nan_count == 0, f"Found {nan_count} NaN values in customer features"
 
+def test_get_fill_values():
+    """Test that fill values are correct for all customer features"""
+    test_customers = pd.DataFrame({'customer_id': ['c1']})
+    test_transactions = pd.DataFrame({
+        't_dat': pd.to_datetime(['2019-10-01']),
+        'customer_id': ['c1'],
+        'article_id': [123],
+        'price': [0.02]
+    })
+    
+    cfe = CustomerFeatureEngineer(test_customers, test_transactions)
+    fill_values = cfe.get_fill_values()
+    
+    assert fill_values['num_purchases'] == 0
+    assert fill_values['total_spent'] == 0
+    assert fill_values['avg_transaction_value'] == 0
+    assert fill_values['customer_price_std'] == 0
+    assert fill_values['days_since_last_purchase'] == 999
+    assert fill_values['avg_days_between_purchases'] == 999
+    assert fill_values['category_diversity'] == 0
+    assert fill_values['primary_department'] == 'Unknown'
+    assert fill_values['primary_garment_group'] == 'Unknown'
+    assert fill_values['FN'] == 0
+    assert fill_values['Active'] == 0
+    assert fill_values['is_new_customer'] == 1
+    assert fill_values['club_member_status_NOT_ACTIVE_MEMBER'] == 0
+    assert fill_values['club_member_status_PRE-CREATE'] == 0
+    assert fill_values['fashion_news_frequency_REGULARLY'] == 0
+    assert fill_values['age'] == 0
 
 @pytest.mark.slow
 def test_calculate_all_features_integration(real_data):

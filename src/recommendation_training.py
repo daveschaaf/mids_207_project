@@ -2,10 +2,13 @@ import pandas as pd
 import numpy as np
 
 class RecommendationTrainingBuilder:
-    def __init__(self, transactions_df, customer_features_df, product_features_df):
+    def __init__(self, transactions_df, customer_features_df, product_features_df, customer_fill_values={}, product_fill_values={}):
         self.transactions = transactions_df
         self.customer_features = customer_features_df
         self.product_features = product_features_df
+        self.customer_fill_values = customer_fill_values
+        self.product_fill_values = product_fill_values
+
     def build_dataset(self, prediction_start=None, prediction_end=None, negative_ratio=2, random_state=67):
         """
         Creates a data set of customer-product pairs
@@ -44,13 +47,19 @@ class RecommendationTrainingBuilder:
         positives = positives.merge(
             self.product_features,
             on='article_id',
-            how='inner'
+            how='left'
         )
         positives = positives.merge(
             self.customer_features,
             on='customer_id',
-            how='inner'
+            how='left'
         )
+        if 'num_purchases' in positives.columns:
+            positives['is_new_customer'] = positives['num_purchases'].isnull().astype(int)
+        else:
+            positives['is_new_customer'] = 0
+        
+        positives = self.fillna(positives)
         return positives
     
     def _sample_negative_examples(self, positives, negative_ratio=2, random_state=67):
@@ -91,4 +100,13 @@ class RecommendationTrainingBuilder:
             on='customer_id',
             how='left'
         )
+        negatives = self.fillna(negatives)
+
         return negatives
+
+    def fillna(self, df):
+        if self.customer_fill_values:
+            df = df.fillna(self.customer_fill_values)
+        if self.product_fill_values:
+            df = df.fillna(self.product_fill_values)
+        return df

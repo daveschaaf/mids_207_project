@@ -79,6 +79,18 @@ class ProductFeatureEngineer:
 
         return agg_data
 
+    def get_fill_values(self):
+        return {
+            'sales_last_7_days': 0,
+            'sales_last_30_days': 0,
+            'days_since_first_sale': 999,
+            'days_since_last_sale': 999,
+            'avg_price': 0,
+            'min_price': 0,
+            'max_price': 0,
+            'product_price_std': 0
+        }
+
     def calculate_all_features(self, as_of_date=None):
         """Combine popularity and price features"""
         popularity = self.calculate_popularity(as_of_date=as_of_date)

@@ -116,8 +116,31 @@ class CustomerFeatureEngineer:
             
             cold_start_df = cold_start_df.drop(['fashion_news_frequency', 'club_member_status'], axis=1)
 
-        return cold_start_df
+        cols_to_keep = ['customer_id', 'is_new_customer']
+        optional_cols = ['FN', 'Active', 'club_member_status_NOT_ACTIVE_MEMBER', 
+                         'club_member_status_PRE-CREATE', 'fashion_news_frequency_REGULARLY']
+        cols_to_keep += [col for col in optional_cols if col in cold_start_df.columns]
+        return cold_start_df[cols_to_keep]
 
+    def get_fill_values(self):
+        return {
+            'num_purchases': 0,
+            'total_spent': 0,
+            'avg_transaction_value': 0,
+            'customer_price_std': 0,
+            'days_since_last_purchase': 999,
+            'avg_days_between_purchases': 999,
+            'category_diversity': 0,
+            'primary_department': 'Unknown',
+            'primary_garment_group': 'Unknown',
+            'FN': 0,
+            'Active': 0,
+            'is_new_customer': 1,
+            'club_member_status_NOT_ACTIVE_MEMBER': 0,
+            'club_member_status_PRE-CREATE': 0,
+            'age': 0,
+            'fashion_news_frequency_REGULARLY': 0
+        }
 
     def _as_of_date(self, as_of_date=None):
         if as_of_date == None:

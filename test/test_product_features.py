@@ -133,6 +133,28 @@ def test_product_all_features_no_nans():
     nan_count = result.isna().sum().sum()
     assert nan_count == 0, f"Found {nan_count} NaN values in product features"
 
+def test_get_fill_values():
+    """Test that fill values are correct for all product features"""
+    test_articles = pd.DataFrame({'article_id': [123]})
+    test_transactions = pd.DataFrame({
+        't_dat': pd.to_datetime(['2019-10-01']),
+        'customer_id': ['c1'],
+        'article_id': [123],
+        'price': [0.02]
+    })
+    
+    pfe = ProductFeatureEngineer(test_articles, test_transactions)
+    fill_values = pfe.get_fill_values()
+    
+    assert fill_values['sales_last_7_days'] == 0
+    assert fill_values['sales_last_30_days'] == 0
+    assert fill_values['days_since_first_sale'] == 999
+    assert fill_values['days_since_last_sale'] == 999
+    assert fill_values['avg_price'] == 0
+    assert fill_values['min_price'] == 0
+    assert fill_values['max_price'] == 0
+    assert fill_values['product_price_std'] == 0
+    
 def test_product_all_features_integration(real_data):
     """Integration test using actual H&M data"""
     pfe = ProductFeatureEngineer(real_data['articles'], real_data['transactions'])

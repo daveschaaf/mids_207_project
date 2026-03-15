@@ -167,6 +167,9 @@ def test_build_dataset_integration(real_data):
     assert 'num_purchases' in training_data.columns
     assert 'sales_last_7_days' in training_data.columns
     assert 'avg_price' in training_data.columns
+    assert 'age' in training_data.columns
+    assert 'age_x' not in training_data.columns
+    assert 'age_y' not in training_data.columns
     feature_cols = [col for col in training_data.columns 
                     if col not in ['customer_id', 'article_id', 'purchased']]
     for col in feature_cols:

@@ -38,12 +38,12 @@ def test_get_positive_examples():
 def test_get_positive_examples_with_features():
     """Test that positive examples include customer and product features"""
     transactions = pd.DataFrame({
-        't_dat': pd.to_datetime(['2019-10-05', '2019-10-15']),
-        'customer_id': ['c1', 'c2'],
-        'article_id': [456, 789],
-        'price': [0.02, 0.03]
+        't_dat': pd.to_datetime(['2019-10-05', '2019-10-15', '2019-10-20', '2019-10-25']),
+        'customer_id': ['c1', 'c2', 'c3', 'c1'],
+        'article_id': [456, 789, 456, 111],
+        'price': [0.02, 0.03, 0.02, 0.01]
     })
-    
+
     customer_features = pd.DataFrame({
         'customer_id': ['c1', 'c2'],
         'days_since_last_purchase': [5, 10],
@@ -55,23 +55,42 @@ def test_get_positive_examples_with_features():
         'avg_price': [0.02, 0.03],
         'sales_last_7_days': [10, 20]
     })
+    customer_fill_values = {'num_purchases': 0, 'days_since_last_purchase': 999, 'is_new_customer': 1}
+    product_fill_values = {'avg_price': 0, 'sales_last_7_days': 0}
+    builder = RecommendationTrainingBuilder(
+        transactions, customer_features, product_features,
+        customer_fill_values=customer_fill_values,
+        product_fill_values=product_fill_values)
     
-    builder = RecommendationTrainingBuilder(transactions, customer_features, product_features)
     positives = builder._get_positive_examples(
         prediction_start='2019-10-01',
         prediction_end='2019-10-31'
     )
     
-    assert len(positives) == 2
+    assert len(positives) == 4
     assert 'purchased' in positives.columns
     assert 'days_since_last_purchase' in positives.columns
     assert 'num_purchases' in positives.columns
     assert 'avg_price' in positives.columns
     assert 'sales_last_7_days' in positives.columns
+    assert 'is_new_customer' in positives.columns
+
     c1_row = positives[positives['customer_id'] == 'c1'].iloc[0]
     assert c1_row['days_since_last_purchase'] == 5
     assert c1_row['avg_price'] == 0.02
     assert c1_row['purchased'] == 1
+    assert c1_row['is_new_customer'] == 0
+
+    c3_row = positives[positives['customer_id'] == 'c3'].iloc[0]
+    assert c3_row['days_since_last_purchase'] == 999
+    assert c3_row['avg_price'] == 0.02
+    assert c3_row['purchased'] == 1
+    assert c3_row['num_purchases'] == 0
+    assert c3_row['is_new_customer'] == 1
+
+    art111_row = positives[positives['article_id'] == 111].iloc[0]
+    assert art111_row['avg_price'] == 0
+    assert art111_row['sales_last_7_days'] == 0
 
 def test_sample_negative_examples():
     """Test negative sampling maintains proper ratio per customer"""
@@ -130,7 +149,9 @@ def test_build_dataset_integration(real_data):
     builder = RecommendationTrainingBuilder(
         transactions_sample,
         customer_features,
-        product_features
+        product_features,
+        product_fill_values=pfe.get_fill_values(),
+        customer_fill_values=cfe.get_fill_values()
     )
     training_data = builder.build_dataset(
         prediction_start='2019-10-01',
@@ -146,6 +167,9 @@ def test_build_dataset_integration(real_data):
     assert 'num_purchases' in training_data.columns
     assert 'sales_last_7_days' in training_data.columns
     assert 'avg_price' in training_data.columns
+    assert 'age' in training_data.columns
+    assert 'age_x' not in training_data.columns
+    assert 'age_y' not in training_data.columns
     feature_cols = [col for col in training_data.columns 
                     if col not in ['customer_id', 'article_id', 'purchased']]
     for col in feature_cols:

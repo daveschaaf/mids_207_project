@@ -1,6 +1,7 @@
+.virtual_documents
+/data
+.ipynb_checkpoints/
 __pycache__/
 .DS_Store
 .vscode/
-
 EDA_DATACLEANING/*.csv
-.DS_Store

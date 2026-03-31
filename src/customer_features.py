@@ -16,12 +16,9 @@ class CustomerFeatureEngineer:
         customer_price_std
         avg_days_between purchases
         """
-        if as_of_date == None:
-            as_of_date = self.transactions['t_dat'].max()
-        as_of_date = pd.to_datetime(as_of_date)
+        as_of_date = self._as_of_date(as_of_date)
 
-        relevant_txn = self.transactions[self.transactions['t_dat'] <= as_of_date]
-
+        relevant_txn = self._relevant_transactions(as_of_date)
         agg_data = relevant_txn.groupby('customer_id').agg(
             first_purchase_date = ('t_dat', 'min'),
             last_purchase_date = ('t_dat', 'max'),
@@ -29,11 +26,22 @@ class CustomerFeatureEngineer:
             num_purchases = ('t_dat', 'count'),
             total_spent = ('price','sum')
         ).reset_index()
+
+        customer_cols = ['customer_id']
+        if 'age' in self.customers.columns:
+            customer_cols.append('age')
+
+        agg_data = self.customers[customer_cols].merge(
+            agg_data,
+            on='customer_id',
+            how='left'
+        )
+        agg_data['num_purchases'] = agg_data['num_purchases'].fillna(0).astype(int)
+        agg_data['total_spent'] = agg_data['total_spent'].fillna(0)
        
-        # Low numbers are good, so we fill with the max value + 1
+        # Low numbers are good, so we fill with arbitrary high value
         agg_data['days_since_last_purchase'] = (as_of_date - agg_data['last_purchase_date']).dt.days
-        max_recency = agg_data['days_since_last_purchase'].max() + 1
-        agg_data['days_since_last_purchase'] = agg_data['days_since_last_purchase'].fillna(max_recency) 
+        agg_data['days_since_last_purchase'] = agg_data['days_since_last_purchase'].fillna(999) 
         
         agg_data['avg_transaction_value'] = (agg_data['total_spent'] / agg_data['num_purchases']).fillna(0)
         
@@ -60,12 +68,9 @@ class CustomerFeatureEngineer:
         def category_mode(category):
             return category.mode()[0] if not category.mode().empty else None
 
-        if as_of_date == None:
-            as_of_date = self.transactions['t_dat'].max()
-        as_of_date = pd.to_datetime(as_of_date)
-
+        as_of_date = self._as_of_date(as_of_date)
         
-        relevant_txn = self.transactions[self.transactions['t_dat'] <= as_of_date]
+        relevant_txn = self._relevant_transactions(as_of_date)
         txn_with_category = relevant_txn.merge(
             articles_df[['article_id','department_name', 'garment_group_name']],
             on = 'article_id',
@@ -77,13 +82,87 @@ class CustomerFeatureEngineer:
             category_diversity = ('department_name', 'nunique')
         ).reset_index()
 
+        category_df = self.customers[['customer_id']].merge(
+            category_df,
+            on='customer_id',
+            how='left'
+        )
+        category_df['primary_department'] = category_df['primary_department'].fillna('Unknown')
+        category_df['primary_garment_group'] = category_df['primary_garment_group'].fillna('Unknown')
+        category_df['category_diversity'] = category_df['category_diversity'].fillna(0).astype(int)
+
         return category_df
+   
+    def calculate_cold_start_features(self, as_of_date=None):
+        as_of_date = self._as_of_date(as_of_date)
+        relevant_txn = self._relevant_transactions(as_of_date)
+        cold_start_df = self.customers.copy()
+        
+        cold_start_df['is_new_customer'] = (~cold_start_df['customer_id'].isin(relevant_txn['customer_id'])).astype(int)
+
+        if 'club_member_status' in cold_start_df.columns:
+            cold_start_df['club_member_status'] = cold_start_df['club_member_status'].replace('LEFT CLUB', 'NOT_ACTIVE_MEMBER')
+            club_member_dummy = pd.get_dummies(cold_start_df['club_member_status'], prefix='club_member_status', dtype=int, drop_first=False)
+            if 'club_member_status_ACTIVE' in club_member_dummy.columns:
+                club_member_dummy = club_member_dummy.drop('club_member_status_ACTIVE', axis=1)
+            cold_start_df = pd.concat([cold_start_df, club_member_dummy ], axis=1)
+       
+        if 'fashion_news_frequency' in cold_start_df.columns:
+            cold_start_df['fashion_news_frequency'] = cold_start_df['fashion_news_frequency'].replace("MONTHLY", "REGULARLY")
+            fashion_news_dummy = pd.get_dummies(cold_start_df['fashion_news_frequency'], prefix='fashion_news_frequency', dtype=int, drop_first=False)
+            if 'fashion_news_frequency_NONE' in fashion_news_dummy.columns:
+                fashion_news_dummy = fashion_news_dummy.drop('fashion_news_frequency_NONE', axis=1)
+            cold_start_df = pd.concat([cold_start_df, fashion_news_dummy], axis=1)
+            
+            cold_start_df = cold_start_df.drop(['fashion_news_frequency', 'club_member_status'], axis=1)
+
+        cols_to_keep = ['customer_id', 'is_new_customer']
+        optional_cols = ['FN', 'Active', 'club_member_status_NOT_ACTIVE_MEMBER', 
+                         'club_member_status_PRE-CREATE', 'fashion_news_frequency_REGULARLY']
+        cols_to_keep += [col for col in optional_cols if col in cold_start_df.columns]
+        return cold_start_df[cols_to_keep]
+
+    def get_fill_values(self):
+        return {
+            'num_purchases': 0,
+            'total_spent': 0,
+            'avg_transaction_value': 0,
+            'customer_price_std': 0,
+            'days_since_last_purchase': 999,
+            'avg_days_between_purchases': 999,
+            'category_diversity': 0,
+            'primary_department': 'Unknown',
+            'primary_garment_group': 'Unknown',
+            'FN': 0,
+            'Active': 0,
+            'is_new_customer': 1,
+            'club_member_status_NOT_ACTIVE_MEMBER': 0,
+            'club_member_status_PRE-CREATE': 0,
+            'age': 0,
+            'fashion_news_frequency_REGULARLY': 0
+        }
+
+    def _as_of_date(self, as_of_date=None):
+        if as_of_date == None:
+            as_of_date = self.transactions['t_dat'].max()
+        return pd.to_datetime(as_of_date)
+
+    def _relevant_transactions(self, as_of_date):
+        return self.transactions[self.transactions['t_dat'] <= as_of_date]
+
     def calculate_all_features(self, articles_df, as_of_date=None):
         rfm_behaviors = self.calculate_rfm_and_behaviors(as_of_date)
         categories = self.calculate_category_preferences(articles_df, as_of_date)
+        cold_start = self.calculate_cold_start_features(as_of_date)
 
         all_features = rfm_behaviors.merge(
             categories,
+            on='customer_id',
+            how = 'left'
+        ).reset_index(drop=True)
+
+        all_features = all_features.merge(
+            cold_start,
             on='customer_id',
             how = 'left'
         ).reset_index(drop=True)
